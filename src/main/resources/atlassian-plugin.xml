@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<atlassian-plugin key="${atlassian.plugin.key}" name="${project.name}" plugins-version="2">
+    <plugin-info>
+        <description>${project.description}</description>
+        <version>${project.version}</version>
+        <vendor name="${project.organization.name}" url="${project.organization.url}"/>
+        <param name="plugin-icon">images/pluginIcon.png</param>
+        <param name="plugin-logo">images/pluginLogo.png</param>
+    </plugin-info>
+    <!-- add our i18n resource -->
+    <resource type="i18n" name="i18n" location="mySecondPlugin"/>
+    <!-- add our web resources -->
+    <web-resource key="mySecondPlugin-resources" name="mySecondPlugin Web Resources">
+        <dependency>com.atlassian.auiplugin:ajs</dependency>
+        <resource type="download" name="mySecondPlugin.css" location="/css/mySecondPlugin.css"/>
+        <resource type="download" name="mySecondPlugin.js" location="/js/mySecondPlugin.js"/>
+        <resource type="download" name="images/" location="/images"/>
+        <resource type="download" name="keycloak.json" location="/keycloak.json"/>
+        <context>mySecondPlugin</context>
+    </web-resource>
+    <servlet-filter name="Adapted Keycloak Oidc Filter" i18n-name-key="adapted-keycloak-oidc-filter.name"
+                    key="adapted-keycloak-oidc-filter" class="com.example.servlet.filter.AdaptedKeycloakOidcFilter"
+                    location="before-dispatch" weight="100">
+        <description key="adapted-keycloak-oidc-filter.description">The Adapted Keycloak Oidc Filter Plugin
+        </description>
+        <url-pattern>/*</url-pattern>
+    </servlet-filter>
+</atlassian-plugin>
