@@ -3,7 +3,7 @@ package com.example.servlet.filter;
  * Adapted from https://github.com/keycloak/keycloak/blob/master/adapters/oidc/servlet-filter/src/main/java/org/keycloak/adapters/servlet/KeycloakOIDCFilter.java
  * I changed the logger and added further debugging messages relevant to me
  * I also edited the standard location of the keycloak file
- * Furthermore i added functionality to also add a jira login to the httpsession
+ * Furthermore i added functionality to also add a confluence login to the httpsession
  * I needed to copy some methods over in a one-to-one session since they were private in the superclass
  * Below you will find the original copyright statement
  * Many thanks to the awesome Red Hat developers writing Keycloak, the servlet adapter and putting it all under Apache 2.0!
@@ -28,8 +28,9 @@ package com.example.servlet.filter;
 
 
 import com.atlassian.confluence.user.ConfluenceAuthenticator;
-import com.atlassian.crowd.embedded.api.CrowdService;
-import com.atlassian.crowd.embedded.api.User;
+import com.atlassian.confluence.user.ConfluenceUser;
+import com.atlassian.confluence.user.UserAccessor;
+import com.atlassian.spring.container.ContainerManager;
 import org.keycloak.KeycloakSecurityContext;
 import org.keycloak.adapters.*;
 import org.keycloak.adapters.servlet.FilterRequestAuthenticator;
@@ -40,7 +41,6 @@ import org.keycloak.adapters.spi.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.inject.Inject;
 import javax.servlet.*;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
@@ -49,7 +49,6 @@ import javax.servlet.http.HttpSession;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.Principal;
-import java.util.Enumeration;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -70,8 +69,6 @@ public class AdaptedKeycloakOidcFilter extends KeycloakOIDCFilter {
 
     private final KeycloakConfigResolver definedconfigResolver;
 
-    @Inject
-    private CrowdService crowdService;
 
     /**
      * Constructor that can be used to define a {@code KeycloakConfigResolver} that will be used at initialization to
@@ -100,7 +97,7 @@ public class AdaptedKeycloakOidcFilter extends KeycloakOIDCFilter {
         String path = "/keycloak.json";
         String pathParam = filterConfig.getInitParameter(CONFIG_PATH_PARAM);
         if (pathParam != null) path = pathParam;
-        log.warn("searching for config at path " + path);
+        log.debug("searching for config at path " + path);
         InputStream is = filterConfig.getServletContext().getResourceAsStream(path);
 
 
@@ -127,7 +124,6 @@ public class AdaptedKeycloakOidcFilter extends KeycloakOIDCFilter {
     @Override
     public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain) throws IOException, ServletException {
 
-        log.info("Keycloak OIDC Filter");
         HttpServletRequest request = (HttpServletRequest) req;
         HttpServletResponse response = (HttpServletResponse) res;
 
@@ -135,45 +131,36 @@ public class AdaptedKeycloakOidcFilter extends KeycloakOIDCFilter {
             chain.doFilter(req, res);
             return;
         }
-        HttpSession session = request.getSession();
-        log.warn("User already has a session");
-        Enumeration enumeration = session.getAttributeNames();
 
-        /*the LOGGED_IN_KEY and its counterpart LOGGED_OUT_KEY do exist and are fields of the DefaultAuthenticator the ConfluenceAuthenticator extends
-        IntelliJ shows a false negative there
-        */
+        HttpSession session = request.getSession();
         Principal principal = (Principal) session.getAttribute(ConfluenceAuthenticator.LOGGED_IN_KEY);
 
         if (principal != null) {
-            log.warn("found jira user " + principal.getName() + " so we continue the filter chain");
+            log.info("confluence user " + principal.getName() + " is already authenticated, continuing");
             chain.doFilter(req, res);
             return;
         }
-        while (enumeration.hasMoreElements()) {
-            log.warn(enumeration.nextElement().toString());
-        }
-        log.warn("end of enumeration");
-        //Prüfen darauf, dass sich der User nicht angemeldet hat und nicht darauf, dass er sich abgemeldet hat
+        //Prüfen auf Abwesenheit einer Anmeldung
         if (session.getAttribute(ConfluenceAuthenticator.LOGGED_IN_KEY) == null) {
-            log.warn("user is not logged in");
             RefreshableKeycloakSecurityContext account = (RefreshableKeycloakSecurityContext) session.getAttribute(
                     KeycloakSecurityContext.class.getName());
 
             if (account != null) {
-                log.warn("Found a valid KC user, attempting login");
-                User user = crowdService.getUser(account.getToken().getPreferredUsername());
+                log.info("Found a valid KC user, attempting login");
+                ConfluenceUser user = getAccessor().getUserByName(account.getToken().getPreferredUsername());
                 if (user == null) {
-                    log.warn("User is in keycloak, but isn't added to jira");
+                    log.warn("User exists in keycloak, but not in confluence");
                     chain.doFilter(req, res);
                     return;
                 } else {
                     Object object = session.getAttribute(ConfluenceAuthenticator.LOGGED_OUT_KEY);
                     if (object != null) {
-                        log.warn("removing session attribute " + ConfluenceAuthenticator.LOGGED_OUT_KEY);
+                        log.info("removing session attribute " + ConfluenceAuthenticator.LOGGED_OUT_KEY);
                         session.removeAttribute(ConfluenceAuthenticator.LOGGED_OUT_KEY);
                     }
+
                     session.setAttribute(ConfluenceAuthenticator.LOGGED_IN_KEY, user);
-                    log.warn("Set the session attribute " + ConfluenceAuthenticator.LOGGED_IN_KEY + " for user " + user.getDisplayName());
+                    log.info("Succesfully authenticated user " + user.getName() + "via keycloak SSO");
                     chain.doFilter(req, res);
                     return;
                 }
@@ -265,9 +252,12 @@ public class AdaptedKeycloakOidcFilter extends KeycloakOIDCFilter {
         }
 
         String requestPath = request.getRequestURI().substring(request.getContextPath().length());
-        log.warn("Evaluating the request with path " + requestPath);
+        log.info("Possibly skipping the request with path " + requestPath);
         return skipPattern.matcher(requestPath).matches();
     }
 
+    protected UserAccessor getAccessor() {
+        return (UserAccessor) ContainerManager.getComponent("userAccessor");
+    }
 
 }
