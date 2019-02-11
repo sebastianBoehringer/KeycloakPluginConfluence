@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.example</groupId>
-    <artifactId>mySecondPlugin</artifactId>
+    <artifactId>KeycloakConfluencePlugin</artifactId>
     <version>1.0.0</version>
     <organization>
         <name>J. Schmalz GmbH</name>
@@ -13,6 +13,39 @@
     <name>mySecondPlugin</name>
     <description>This is the com.example:mySecondPlugin plugin for Atlassian Confluence.</description>
     <packaging>atlassian-plugin</packaging>
+
+    <!-- Atlassian Repos for building without SDK-->
+    <repositories>
+        <repository>
+            <id>atlassian-public</id>
+            <url>https://packages.atlassian.com/maven/repository/public</url>
+            <snapshots>
+                <enabled>true</enabled>
+                <updatePolicy>never</updatePolicy>
+                <checksumPolicy>warn</checksumPolicy>
+            </snapshots>
+            <releases>
+                <enabled>true</enabled>
+                <checksumPolicy>warn</checksumPolicy>
+            </releases>
+        </repository>
+    </repositories>
+    <pluginRepositories>
+        <pluginRepository>
+            <id>atlassian-public</id>
+            <url>https://packages.atlassian.com/maven/repository/public</url>
+            <snapshots>
+                <enabled>true</enabled>
+                <updatePolicy>never</updatePolicy>
+                <checksumPolicy>warn</checksumPolicy>
+            </snapshots>
+            <releases>
+                <enabled>true</enabled>
+                <checksumPolicy>warn</checksumPolicy>
+            </releases>
+        </pluginRepository>
+    </pluginRepositories>
+
     <dependencies>
 
         <dependency>
@@ -83,7 +116,7 @@
         <dependency>
             <groupId>org.apache.httpcomponents</groupId>
             <artifactId>httpclient</artifactId>
-            <version>4.1.1</version>
+            <version>4.3.6</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -102,6 +135,7 @@
     <build>
         <plugins>
             <plugin>
+                <!-- responsible for spawning a test jira instance upon using atlas-run-->
                 <groupId>com.atlassian.maven.plugins</groupId>
                 <artifactId>maven-confluence-plugin</artifactId>
                 <version>${amps.version}</version>
@@ -120,7 +154,6 @@
                         <!-- Add package import here -->
                         <Import-Package>org.springframework.osgi.*;resolution:="optional",
                             org.eclipse.gemini.blueprint.*;resolution:="optional",
-                            com.atlassian.
                             *;version="0";resolution:="optional"
                         </Import-Package>
                         <!-- Ensure plugin is spring powered -->
