@@ -4,14 +4,14 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.example</groupId>
-    <artifactId>KeycloakConfluencePlugin</artifactId>
+    <artifactId>KeycloakPluginConfluence</artifactId>
     <version>1.0.0</version>
     <organization>
         <name>J. Schmalz GmbH</name>
         <url>http://www.schmalz.com/</url>
     </organization>
-    <name>mySecondPlugin</name>
-    <description>This is the com.example:mySecondPlugin plugin for Atlassian Confluence.</description>
+    <name>KeycloakConfluencePlugin</name>
+    <description>This is the com.schmalz:KeycloakPluginConfluence plugin for Atlassian Confluence.</description>
     <packaging>atlassian-plugin</packaging>
 
     <!-- Atlassian Repos for building without SDK-->
