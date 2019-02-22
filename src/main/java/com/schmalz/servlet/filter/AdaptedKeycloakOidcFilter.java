@@ -306,15 +306,23 @@ public class AdaptedKeycloakOidcFilter extends KeycloakOIDCFilter {
     private boolean shouldSkip(HttpServletRequest request) {
 
         if (request.getQueryString() != null && request.getQueryString().contains("noSSO")) {
-            log.info("ignoring this request due to queryparam 'noSSO'");
+            log.warn("ignoring this request due to queryparam 'noSSO'");
+            return true;
+        }
+        String uri = request.getRequestURI();
+        if (uri.contains("/rest")) {
+            log.info("ignoring the request because its a REST call");
             return true;
         }
 
-        // if(request.getRequestURI().contains("/rest")){
-        //     log.info("ignoring the request because its a REST call");
-        //     return true;
-        // }
-
+        if (uri.contains("/download/")) {
+            log.warn("confluence trying to get some ressources, ignoring the request");
+            return true;
+        }
+        if (uri.contains("/dologin.action")) {
+            log.warn("confluence is processing the login request, ignoring");
+            return true;
+        }
         if (skipPattern == null) {
             log.info("Didnt skip the request");
             return false;
