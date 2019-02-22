@@ -2,7 +2,7 @@
 This plugin was created with the Atlassian SDK. See, for example, [the official introduction](https://developer.atlassian.com/display/DOCS/Introduction+to+the+Atlassian+Plugin+SDK).
 To run it, go to the root directory and enter 'atlas-run' in your favorite command shell.
 You may configure keycloak by editing the keycloak.json file according to the documentation [here](https://www.keycloak.org/docs/latest/securing_apps/index.html#java-adapters).
-This was originally developed with Keycloak 4.8.3.Final and Confluence 6.11.
+This was originally developed with Keycloak 4.8.3.Final and Confluence 6.14.
 Please do notice that this is not necessarily the most efficient way possible to authenticate to Confluence
 with [Keycloak](https://www.keycloak.org/). 
 Also if you are looking for actual support please investigate the marketplace for your needs. There should be way better options available to you than using this plugin
@@ -16,7 +16,7 @@ to the URL when accessing CONFLUENCE for the first time in a browser session
 #Getting this plugin running
 1. Make sure keycloak is running on localhost:8180. You can get that done via docker or just by downloading and unziping the official [distribution](https://www.keycloak.org/downloads.html)
 2. Create a user admin, so you can test immediately
-3. Make a basic realm and configure a client for Confluence. Here are [some]() [links]() that might prove useful for this
+3. Make a basic realm and configure a client for Confluence. Here are [some](https://www.keycloak.org/docs/latest/server_admin/index.html#_create-realm) [links](https://www.keycloak.org/docs/latest/getting_started/index.html) that might prove useful for this
 4. Edit the keycloak.json file according to your configuration
 2. If you did not already install the Atlassian SDK. Here is a link to a [tutorial](https://developer.atlassian.com/server/framework/atlassian-sdk/install-the-atlassian-sdk-on-a-windows-system/) for windows
 3. Clone this repository
