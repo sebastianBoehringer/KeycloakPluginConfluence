@@ -13,15 +13,13 @@
     <!-- add our web resources -->
     <web-resource key="mySecondPlugin-resources" name="mySecondPlugin Web Resources">
         <dependency>com.atlassian.auiplugin:ajs</dependency>
-        <resource type="download" name="mySecondPlugin.css" location="/css/mySecondPlugin.css"/>
-        <resource type="download" name="mySecondPlugin.js" location="/js/mySecondPlugin.js"/>
         <resource type="download" name="images/" location="/images"/>
         <resource type="download" name="keycloak.json" location="/keycloak.json"/>
         <context>mySecondPlugin</context>
     </web-resource>
     <servlet-filter name="Adapted Keycloak Oidc Filter" i18n-name-key="adapted-keycloak-oidc-filter.name"
-                    key="adapted-keycloak-oidc-filter" class="com.example.servlet.filter.AdaptedKeycloakOidcFilter"
-                    location="before-dispatch" weight="100">
+                    key="adapted-keycloak-oidc-filter" class="com.schmalz.servlet.filter.AdaptedKeycloakOidcFilter"
+                    location="before-login" weight="100">
         <description key="adapted-keycloak-oidc-filter.description">The Adapted Keycloak Oidc Filter Plugin
         </description>
         <url-pattern>/*</url-pattern>
