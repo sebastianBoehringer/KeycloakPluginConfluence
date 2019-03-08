@@ -30,73 +30,77 @@ package com.schmalz.servlet.filter;
 import com.atlassian.confluence.user.ConfluenceAuthenticator;
 import com.atlassian.confluence.user.ConfluenceUser;
 import com.atlassian.confluence.user.UserAccessor;
+import com.atlassian.plugin.spring.scanner.annotation.component.Scanned;
+import com.atlassian.plugin.spring.scanner.annotation.imports.ComponentImport;
+import com.atlassian.sal.api.pluginsettings.PluginSettings;
+import com.atlassian.sal.api.pluginsettings.PluginSettingsFactory;
 import com.atlassian.spring.container.ContainerManager;
+import com.schmalz.servlet.ConfigServlet;
 import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
 import org.keycloak.KeycloakSecurityContext;
 import org.keycloak.adapters.*;
-import org.keycloak.adapters.servlet.FilterRequestAuthenticator;
 import org.keycloak.adapters.servlet.KeycloakOIDCFilter;
-import org.keycloak.adapters.servlet.OIDCFilterSessionStore;
-import org.keycloak.adapters.servlet.OIDCServletHttpFacade;
-import org.keycloak.adapters.spi.AuthChallenge;
-import org.keycloak.adapters.spi.AuthOutcome;
-import org.keycloak.adapters.spi.UserSessionManagement;
+import org.keycloak.representations.adapters.config.AdapterConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.servlet.*;
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletRequestWrapper;
-import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import javax.ws.rs.core.UriBuilder;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.Principal;
 import java.util.Enumeration;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.regex.Pattern;
 
-
+@Scanned
 public class AdaptedKeycloakOidcFilter extends KeycloakOIDCFilter {
-
+    public static final String SETTINGS_KEY = AdaptedKeycloakOidcFilter.class.getName() + "-keycloakConfluencePlugin-SettingsKey";
     private final Logger log = LoggerFactory.getLogger(this.getClass());
 
     private final KeycloakConfigResolver definedconfigResolver;
-
+    @ComponentImport
+    private final PluginSettingsFactory factory;
     private String realm;
     private String authServer;
+    private FilterConfig filterConfiguration;
+    private String resource;
 
     /**
-     * Constructor that can be used to define a {@code KeycloakConfigResolver} that will be used at initialization to
+     * Constructor that can be used to define a {@code ConfigResolver} that will be used at initialization to
      * provide the {@code KeycloakDeployment}.
      *
      * @param definedconfigResolver the resolver
      */
-    public AdaptedKeycloakOidcFilter(KeycloakConfigResolver definedconfigResolver) {
+    public AdaptedKeycloakOidcFilter(KeycloakConfigResolver definedconfigResolver, PluginSettingsFactory pluginSettingsFactory) {
 
         this.definedconfigResolver = definedconfigResolver;
+        factory = pluginSettingsFactory;
     }
 
-    public AdaptedKeycloakOidcFilter() {
+    public AdaptedKeycloakOidcFilter(PluginSettingsFactory factory) {
 
-        this(null);
+        this(null, factory);
     }
 
     @Override
     public void init(final FilterConfig filterConfig) throws ServletException {
         String skipPatternDefinition = filterConfig.getInitParameter(SKIP_PATTERN_PARAM);
+        this.filterConfiguration = filterConfig;
         if (skipPatternDefinition != null) {
             skipPattern = Pattern.compile(skipPatternDefinition, Pattern.DOTALL);
         }
-
         String path = "/keycloak.json";
         String pathParam = filterConfig.getInitParameter(CONFIG_PATH_PARAM);
         if (pathParam != null) path = pathParam;
         log.debug("searching for config at path " + path);
+
         InputStream is = filterConfig.getServletContext().getResourceAsStream(path);
 
 
@@ -105,7 +109,17 @@ public class AdaptedKeycloakOidcFilter extends KeycloakOIDCFilter {
         realm = kd.getRealm();
         deploymentContext = new AdapterDeploymentContext(kd);
         log.info("Keycloak is using a per-deployment configuration.");
-
+        PluginSettings settings = factory.createGlobalSettings();
+        if (settings.get(SETTINGS_KEY) != null) {
+            handleUpdate(settings);
+        } else {
+            Map<String, String> config = new HashMap<>();
+            config.put(ConfigServlet.AUTH_SERVER_BASEURL_KEY, authServer);
+            config.put(ConfigServlet.RESOURCE_KEY, resource);
+            config.put(ConfigServlet.REALM_KEY, realm);
+            settings.put(SETTINGS_KEY, config);
+            log.warn("updated settings");
+        }
 
         filterConfig.getServletContext().setAttribute(AdapterDeploymentContext.class.getName(), deploymentContext);
         nodesRegistrationManagement = new NodesRegistrationManagement();
@@ -125,10 +139,8 @@ public class AdaptedKeycloakOidcFilter extends KeycloakOIDCFilter {
     public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain) throws IOException, ServletException {
 
         HttpServletRequest request = (HttpServletRequest) req;
-        HttpServletResponse response = (HttpServletResponse) res;
         HttpSession session = request.getSession();
         String query = request.getQueryString();
-
         if (shouldSkip(request)) {
             chain.doFilter(req, res);
             return;
@@ -142,16 +154,21 @@ public class AdaptedKeycloakOidcFilter extends KeycloakOIDCFilter {
         String queryLog = query != null ? query : "NULL";
         log.warn("Quey: " + queryLog);
 */
+        PluginSettings settings = factory.createGlobalSettings();
+        if (Boolean.parseBoolean((String) settings.get(ConfigServlet.UPDATED_SETTINGS_KEY))) {
+            handleUpdate(settings);
+            log.info("updated keycloakconfiguration");
+        }
+
         if (query != null && query.contains("logout=true")) {
             prepareLogout(session);
         }
         if (account != null && session.getAttribute(ConfluenceAuthenticator.LOGGED_OUT_KEY) != null) {
             if (handleLogout(account, session)) {
-                log.warn("logout successful");
-                response.sendRedirect(authServer + "/realms/" + realm + "/protocol/openid-connect/auth?" +
-                        "response_type=code&client_id=confluence&redirect_uri=http%3A%2F%2Flocalhost%3A1990%2Fconfluence%2F");
+                log.debug("logout successful");
+
             } else
-                log.warn("failed logout");
+                log.info("failed logout for user " + account.getToken().getPreferredUsername());
             chain.doFilter(req, res);
             return;
         }
@@ -178,91 +195,26 @@ public class AdaptedKeycloakOidcFilter extends KeycloakOIDCFilter {
 
         }
 
-        /* unchanged code, only changes are additional logging */
-
-        OIDCServletHttpFacade facade = new OIDCServletHttpFacade(request, response);
-        KeycloakDeployment deployment = deploymentContext.resolveDeployment(facade);
-        if (deployment == null || !deployment.isConfigured()) {
-            response.sendError(403);
-            log.error("deployment not configured");
-            return;
-        }
-
-        PreAuthActionsHandler preActions = new PreAuthActionsHandler(new UserSessionManagement() {
-            @Override
-            public void logoutAll() {
-                log.debug("landed in logoutAll method");
-                if (idMapper != null) {
-                    idMapper.clear();
-                }
-            }
-
-            @Override
-            public void logoutHttpSessions(List<String> ids) {
-
-                log.debug("logoutHttpSessions");
-                for (String id : ids) {
-                    log.debug("removed idMapper: " + id);
-                    idMapper.removeSession(id);
-                }
-
-            }
-        }, deploymentContext, facade);
-
-        if (preActions.handleRequest()) {
-            return;
-        }
-
-
-        nodesRegistrationManagement.tryRegister(deployment);
-        OIDCFilterSessionStore tokenStore = new OIDCFilterSessionStore(request, facade, 100000, deployment, idMapper);
-        tokenStore.checkCurrentToken();
-
-
-        FilterRequestAuthenticator authenticator = new FilterRequestAuthenticator(deployment, tokenStore, facade, request, 8443);
-        AuthOutcome outcome = authenticator.authenticate();
-        if (outcome == AuthOutcome.AUTHENTICATED) {
-            log.info("AUTHENTICATED");
-            if (facade.isEnded()) {
-                return;
-            }
-            AuthenticatedActionsHandler actions = new AuthenticatedActionsHandler(deployment, facade);
-            if (actions.handledRequest()) {
-                return;
-            } else {
-                HttpServletRequestWrapper wrapper = tokenStore.buildWrapper();
-                chain.doFilter(wrapper, res);
-                return;
-            }
-        }
-        AuthChallenge challenge = authenticator.getChallenge();
-        if (challenge != null) {
-            log.info("challenge");
-            challenge.challenge(facade);
-            return;
-        }
-        response.sendError(403);
-        /*end of unchanged code, only changes are additional logging */
+        super.doFilter(req, res, chain);
     }
 
     private boolean handleLogout(KeycloakSecurityContext account, HttpSession session) {
         logSessionAttributes(session);
         session.removeAttribute(ConfluenceAuthenticator.LOGGED_OUT_KEY);
         if (account != null) {
-            log.warn("attempting to logout user " + account.getIdToken().getPreferredUsername());
+            log.debug("attempting to logout user " + account.getIdToken().getPreferredUsername());
             HttpGet httpGet = new HttpGet();
             httpGet.setURI(UriBuilder.fromUri(authServer + "/realms/" + realm + "/protocol" +
                     "/openid-connect/logout?id_token_hint=" + account.getIdTokenString()).build());
             log.debug("trying get with " + httpGet.getURI());
             session.removeAttribute(KeycloakSecurityContext.class.getName());
-            try {
-                HttpClient client = new DefaultHttpClient();
+
+            try (CloseableHttpClient client = HttpClientBuilder.create().build()) {
                 HttpResponse httpResponse = client.execute(httpGet);
                 log.debug(httpResponse.getStatusLine().toString());
                 return true;
             } catch (Exception ex) {
                 log.warn("Caught exception " + ex);
-
             }
         }
         return false;
@@ -270,7 +222,7 @@ public class AdaptedKeycloakOidcFilter extends KeycloakOIDCFilter {
     }
 
     private void prepareLogout(HttpSession session) {
-        log.warn("preparing logout");
+        log.debug("preparing logout");
         session.setAttribute(ConfluenceAuthenticator.LOGGED_OUT_KEY, Boolean.TRUE);
     }
 
@@ -306,7 +258,7 @@ public class AdaptedKeycloakOidcFilter extends KeycloakOIDCFilter {
     private boolean shouldSkip(HttpServletRequest request) {
 
         if (request.getQueryString() != null && request.getQueryString().contains("noSSO")) {
-            log.warn("ignoring this request due to queryparam 'noSSO'");
+            log.debug("ignoring this request due to queryparam 'noSSO'");
             return true;
         }
         String uri = request.getRequestURI();
@@ -316,11 +268,11 @@ public class AdaptedKeycloakOidcFilter extends KeycloakOIDCFilter {
         }
 
         if (uri.contains("/download/")) {
-            log.warn("confluence trying to get some ressources, ignoring the request");
+            log.debug("confluence trying to get some ressources, ignoring the request");
             return true;
         }
         if (uri.contains("/dologin.action")) {
-            log.warn("confluence is processing the login request, ignoring");
+            log.debug("confluence is processing the login request, ignoring");
             return true;
         }
         if (skipPattern == null) {
@@ -342,8 +294,40 @@ public class AdaptedKeycloakOidcFilter extends KeycloakOIDCFilter {
         log.warn("end of enum");
     }
 
+    private void handleUpdate(PluginSettings settings) {
+        try {
+            settings.put("myAdapterConfigKey", handleUpdate((Map<String, String>) settings.get(SETTINGS_KEY)));
+        } catch (Exception e) {
+            settings.put("myExceptionKEY", e.getClass().getName());
+        }
+
+        settings.remove(ConfigServlet.UPDATED_SETTINGS_KEY);
+    }
+
+    private String handleUpdate(Map<String, String> config) {
+
+        try (InputStream is = filterConfiguration.getServletContext().getResourceAsStream("/keycloak.json")) {
+            realm = config.get(ConfigServlet.REALM_KEY) != null ? config.get(ConfigServlet.REALM_KEY) : realm;
+            authServer = config.get(ConfigServlet.AUTH_SERVER_BASEURL_KEY) != null ? config.get(ConfigServlet.AUTH_SERVER_BASEURL_KEY) : authServer;
+            resource = config.get(ConfigServlet.RESOURCE_KEY) != null ? config.get(ConfigServlet.RESOURCE_KEY) : resource;
+            AdapterConfig adapterConfig = KeycloakDeploymentBuilder.loadAdapterConfig(is);
+
+            /*order is important here */
+            adapterConfig.setRealm(realm);
+            adapterConfig.setAuthServerUrl(authServer);
+            adapterConfig.setResource(resource);
+            deploymentContext.updateDeployment(adapterConfig);
+           /* KeycloakDeployment ment = KeycloakDeploymentBuilder.build(adapterConfig);
+
+            deploymentContext = new AdapterDeploymentContext(ment);*/
+            return adapterConfig.getAuthServerUrl();
+        } catch (Exception e) {
+            log.warn(e.getMessage());
+            return e.getMessage() + e.getClass().getName();
+        }
+    }
+
     private UserAccessor getAccessor() {
         return (UserAccessor) ContainerManager.getComponent("userAccessor");
     }
-
 }

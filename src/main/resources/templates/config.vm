@@ -1,0 +1,54 @@
+<html>
+<head>
+    <title>Configure your Keycloakdeployment</title>
+    <meta name="decorator" content="atl.general">
+</head>
+<body>
+<div align="center">
+    <h1>Here you can configure the plugin deployment</h1>
+    Hello user $username !!
+
+    <form method="post" action="$requestUrl">
+        <label>Keycloakresource</label>
+        <input type="text" value="$map.resource" required="required" name="resource">
+        <br/>
+
+        <label>KeycloakbaseURL</label>
+        <input type="text" value="$map.authServerUrl" required="required" name="authServerUrl">
+        <br/>
+
+        <label>Keycloakrealm</label>
+        <input type="text" value="$map.realm" required="required" name="realm">
+        <br/>
+
+
+        <label>Public client</label>
+        <input type="checkbox" name="publicClient" #if($checkBox)checked="checked"#end>
+
+
+        <input onclick="document.getElementById('custom').disabled = false; document.getElementById('charstype').disabled = true;"
+               type="radio" name="type" checked="checked">
+        <input type="text" name="custom" id="custom" placeholder="should be 5 charecters at least">
+        <br><br>
+        <input onclick="document.getElementById('custom').disabled = true; document.getElementById('charstype').disabled = false;"
+               type="radio" name="type" value="customurl">random?
+        <select name="charstype" id="charstype" disabled="disabled">
+            <option>Letters</option>
+            <option>Number</option>
+        </select>
+
+        <button type="submit">Update Configuration</button>
+    </form>
+</div>
+
+<!--
+<p>
+    $map.resource is my resource <br>
+    $map.authServer is my BaseURL <br>
+    $map.realm is my realm <br>
+    $requestUrl is the requestUrl
+</p>
+-->
+</body>
+
+</html>
