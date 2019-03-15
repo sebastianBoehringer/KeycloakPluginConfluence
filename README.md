@@ -8,10 +8,11 @@ with [Keycloak](https://www.keycloak.org/).
 Also if you are looking for actual support please investigate the marketplace for your needs. There should be way better options available to you than using this plugin
 
 #Disclaimer
-Currently this plugin does not support SLO. So CONFLUENCE will not react to the logouts in other applications.
+Currently this plugin does not support SLO. So CONFLUENCE will not react to logouts in other applications.
 Also logout request initiated by the Keycloakserver do not have any effect on the logged in user at all.
 But you can still login to CONFLUENCE in an "old school" style by appending the parameter "noSSO"
 to the URL when accessing CONFLUENCE for the first time in a browser session
+If you authenticate with Keycloak, Confluence *will not* update statistics like latest login.
 
 #Getting this plugin running
 1. Make sure keycloak is running on localhost:8180. You can get that done via docker or just by downloading and unziping the official [distribution](https://www.keycloak.org/downloads.html)
